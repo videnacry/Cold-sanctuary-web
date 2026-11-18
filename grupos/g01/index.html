@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#101418">
+  <title>COLD-SANCTUARY</title>
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #101418; touch-action: none; overscroll-behavior: none; -webkit-user-select: none; user-select: none; }
+    #unity-canvas { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; height: 100dvh; display: block; background: #101418; outline: none; }
+    #loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #cfd8dc; font: 16px system-ui, sans-serif; }
+    #bar { width: 60vw; max-width: 320px; height: 10px; border-radius: 5px; background: #263238; overflow: hidden; }
+    #fill { width: 0; height: 100%; background: #80cbc4; }
+    #fs { position: fixed; right: max(8px, env(safe-area-inset-right)); top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border: 0; border-radius: 10px;
+          background: rgba(255,255,255,0.18); color: #fff; font-size: 22px; display: none; z-index: 10; }
+  </style>
+</head>
+<body>
+  <canvas id="unity-canvas" tabindex="-1"></canvas>
+  <div id="loading"><div id="bar"><div id="fill"></div></div><p id="msg">Cargando COLD-SANCTUARY…</p></div>
+  <button id="fs" title="Pantalla completa">⛶</button>
+  <pre id="resultado" hidden style="position:fixed;left:8px;right:8px;bottom:8px;max-height:45vh;overflow:auto;margin:0;padding:8px;background:rgba(0,0,0,0.8);color:#c8e6c9;font:11px monospace;white-space:pre-wrap;z-index:20"></pre>
+  <script>
+    // LA PRUEBA EN LA PÁGINA (?prueba=1, WebPrueba): el juego escribe «[PRUEBA-JSON] {…}» y «[PRUEBA-TITULO] OK|FALLOS n» en la consola;
+    // aquí pasan a #resultado y al título (los lee tools/web/probar-web.ps1). Se engancha ANTES de cargar Unity.
+    (function () {
+      var J = '[PRUEBA-JSON]', T = '[PRUEBA-TITULO]';
+      ['log', 'info', 'warn', 'error'].forEach(function (k) {
+        var orig = console[k];
+        console[k] = function () {
+          try {
+            var s = Array.prototype.join.call(arguments, ' '), i = s.indexOf(J);
+            if (i >= 0) { var el = document.getElementById('resultado'); var txt = s.slice(i + J.length).trim(); try { txt = JSON.stringify(JSON.parse(txt), null, 1); } catch (e) {} el.textContent = txt; el.hidden = false; }
+            i = s.indexOf(T); if (i >= 0) document.title = s.slice(i + T.length).trim();
+          } catch (e) {}
+          return orig.apply(console, arguments);
+        };
+      });
+    })();
+    var canvas = document.querySelector('#unity-canvas');
+    var config = {
+      arguments: [],
+      dataUrl: 'Build/_construyendo.data.unityweb',
+      frameworkUrl: 'Build/_construyendo.framework.js.unityweb',
+      codeUrl: 'Build/_construyendo.wasm.unityweb',
+      streamingAssetsUrl: 'StreamingAssets',
+      companyName: "DefaultCompany",
+      productName: "COLD-SANCTUARY",
+      productVersion: "0.1.0",
+      devicePixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
+      matchWebGLToCanvasSize: true,
+      showBanner: function (msg, type) { console.log(msg); if (type === 'error') document.querySelector('#msg').textContent = msg; }
+    };
+    var fill = document.querySelector('#fill'), fs = document.querySelector('#fs');
+    var root = document.documentElement;
+    var canFs = !!(root.requestFullscreen || root.webkitRequestFullscreen);
+    var script = document.createElement('script');
+    script.src = 'Build/_construyendo.loader.js';
+    script.onload = function () {
+      createUnityInstance(canvas, config, function (p) { fill.style.width = (100 * p) + '%'; }).then(function (inst) {
+        window.unityInstance = inst;
+        document.querySelector('#loading').style.display = 'none';
+        if (canFs) {
+          fs.style.display = 'block';
+          fs.onclick = function () {
+            if (document.fullscreenElement || document.webkitFullscreenElement) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+            var r = (root.requestFullscreen || root.webkitRequestFullscreen).call(root);
+            if (r && r.then && screen.orientation && screen.orientation.unlock) r.then(function () { try { screen.orientation.unlock(); } catch (e) {} });
+          };
+        }
+        canvas.focus();
+      }).catch(function (m) { document.querySelector('#msg').textContent = m; document.title = 'FALLOS carga'; var el = document.getElementById('resultado'); el.textContent = JSON.stringify({ ok: false, fallos: 1, error: String(m) }); el.hidden = false; });
+    };
+    document.body.appendChild(script);
+  </script>
+</body>
+</html>
